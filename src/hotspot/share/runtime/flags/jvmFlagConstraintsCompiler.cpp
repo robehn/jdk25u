@@ -195,7 +195,7 @@ JVMFlag::Error CodeEntryAlignmentConstraintFunc(intx value, bool verbose) {
     return JVMFlag::VIOLATES_CONSTRAINT;
   }
 
-  if (CodeEntryAlignment < 16) {
+  if (CodeEntryAlignment < 4) {
       JVMFlag::printError(verbose,
                           "CodeEntryAlignment (%zd) must be "
                           "greater than or equal to %d\n",
@@ -346,7 +346,7 @@ JVMFlag::Error InteriorEntryAlignmentConstraintFunc(intx value, bool verbose) {
      return JVMFlag::VIOLATES_CONSTRAINT;
    }
 
-  int minimum_alignment = 16;
+  int minimum_alignment = 4;
 #if defined(X86) && !defined(AMD64)
   minimum_alignment = 4;
 #elif defined(S390)

@@ -466,7 +466,6 @@
                                                                                                                                      \
   nonstatic_field(CodeHeap,                    _memory,                                       VirtualSpace)                          \
   nonstatic_field(CodeHeap,                    _segmap,                                       VirtualSpace)                          \
-  nonstatic_field(CodeHeap,                    _log2_segment_size,                            int)                                   \
   nonstatic_field(HeapBlock,                   _header,                                       HeapBlock::Header)                     \
   nonstatic_field(HeapBlock::Header,           _length,                                       uint32_t)                              \
   nonstatic_field(HeapBlock::Header,           _used,                                         bool)                                  \

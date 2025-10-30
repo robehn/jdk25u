@@ -1512,7 +1512,7 @@ const int ObjectAlignmentInBytes = 8;
   product_pd(uintx, CodeCacheSegmentSize, EXPERIMENTAL,                     \
           "Code cache segment size (in bytes) - smallest unit of "          \
           "allocation")                                                     \
-          range(1, 1024)                                                    \
+          range(1, 4096)                                                    \
           constraint(CodeCacheSegmentSizeConstraintFunc, AfterErgo)         \
                                                                             \
   product_pd(intx, CodeEntryAlignment, EXPERIMENTAL,                        \

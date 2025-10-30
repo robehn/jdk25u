@@ -176,6 +176,10 @@ public:
 
   ~CodeBlob() {
     assert(_oop_maps == nullptr, "Not flushed");
+    if (UseNewCode) {
+      int size = blob_end() - content_begin();
+      memset(content_begin(), 0xaa, size);
+    }
   }
 
   // Returns the space needed for CodeBlob

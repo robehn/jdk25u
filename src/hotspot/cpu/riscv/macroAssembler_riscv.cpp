@@ -4912,7 +4912,24 @@ void MacroAssembler::remove_frame(int framesize) {
   assert(framesize % (2*wordSize) == 0, "must preserve 2*wordSize alignment");
   ld(fp, Address(sp, framesize - 2 * wordSize));
   ld(ra, Address(sp, framesize - wordSize));
+
+  if (UseNewCode) {
+    mv(x21, sp);
+  }
+
   add(sp, sp, framesize);
+
+  if (UseNewCode) {
+    mv(x22, 0xdeadbeefdeadbeefull);
+    Label loop, ok;
+    bind(loop);
+    sd(x22, Address(x21));
+    addi(x21, x21, 8);
+    bgt(sp, x21, loop);
+    beq(sp, x21, ok);
+    stop("over run");
+    bind(ok);
+  }
 }
 
 void MacroAssembler::reserved_stack_check() {

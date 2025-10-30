@@ -39,7 +39,6 @@ CodeHeap::CodeHeap(const char* name, const CodeBlobType code_blob_type)
   _number_of_committed_segments = 0;
   _number_of_reserved_segments  = 0;
   _segment_size                 = 0;
-  _log2_segment_size            = 0;
   _next_segment                 = 0;
   _freelist                     = nullptr;
   _last_insert_point            = nullptr;
@@ -161,13 +160,21 @@ void CodeHeap::mark_segmap_as_used(size_t beg, size_t end, bool is_FreeBlock_joi
   }
 }
 
-void CodeHeap::invalidate(size_t beg, size_t end, size_t hdr_size) {
+void CodeHeap::invalidate(size_t beg_seg, size_t end_seg, size_t hdr_size) {
 #ifndef PRODUCT
   // Fill the given range with some bad value.
   // length is expected to be in segment_size units.
   // This prevents inadvertent execution of code leftover from previous use.
-  char* p = low_boundary() + segments_to_size(beg) + hdr_size;
-  memset(p, badCodeHeapNewVal, segments_to_size(end-beg)-hdr_size);
+  char* start = low() + segments_to_size(beg_seg) + hdr_size;
+  size_t n = segments_to_size(end_seg-beg_seg)-hdr_size;
+  char* end = start + n;
+  assert(start >= low(), "Must be: %p >= %p", start, low());
+  assert(start < high(), "Must be: %p < %p",  start, high());
+  assert(end >= start,   "Must be: %p >= %p", end, start);
+  assert(end <= high(),  "Must be: %p <= %p", end,  high());
+  if (end > start) {
+    memset(start, badCodeHeapNewVal, n);
+  }
 #endif
 }
 
@@ -180,7 +187,6 @@ void CodeHeap::clear() {
   _next_segment = 0;
   clear(_next_segment, _number_of_committed_segments);
 }
-
 
 static size_t align_to_page_size(size_t size) {
   const size_t alignment = os::vm_page_size();
@@ -201,11 +207,9 @@ bool CodeHeap::reserve(ReservedSpace rs, size_t committed_size, size_t segment_s
   assert(rs.size() >= committed_size, "reserved < committed");
   assert(is_aligned(committed_size, rs.page_size()), "must be page aligned");
   assert(segment_size >= sizeof(FreeBlock), "segment size is too small");
-  assert(is_power_of_2(segment_size), "segment_size must be a power of 2");
   assert_locked_or_safepoint(CodeCache_lock);
 
   _segment_size      = segment_size;
-  _log2_segment_size = exact_log2(segment_size);
 
   // Reserve and initialize space for _memory.
   os::trace_page_sizes(_name, committed_size, rs.size(), rs.base(), rs.size(), rs.page_size());
@@ -214,9 +218,13 @@ bool CodeHeap::reserve(ReservedSpace rs, size_t committed_size, size_t segment_s
   }
 
   on_code_mapping(_memory.low(), _memory.committed_size());
-  _number_of_committed_segments = size_to_segments(_memory.committed_size());
-  _number_of_reserved_segments  = size_to_segments(_memory.reserved_size());
+  _number_of_committed_segments = size_to_segments_down(_memory.committed_size());
+  _number_of_reserved_segments  = size_to_segments_down(_memory.reserved_size());
   assert(_number_of_reserved_segments >= _number_of_committed_segments, "just checking");
+
+  size_t size_used = segments_to_size(_number_of_committed_segments);
+  char* end_addr = low() + size_used;
+
   const size_t reserved_segments_alignment = MAX2(os::vm_page_size(), os::vm_allocation_granularity());
   const size_t reserved_segments_size = align_up(_number_of_reserved_segments, reserved_segments_alignment);
   const size_t committed_segments_size = align_to_page_size(_number_of_committed_segments);
@@ -226,6 +234,8 @@ bool CodeHeap::reserve(ReservedSpace rs, size_t committed_size, size_t segment_s
   if (!_segmap.initialize(seg_rs, committed_segments_size)) {
     return false;
   }
+
+  assert(end_addr > low() && end_addr <= high(), "Must be: %p <= %p < %p", low(), end_addr, high());
 
   assert(_segmap.committed_size() >= (size_t) _number_of_committed_segments, "could not commit  enough space for segment map");
   assert(_segmap.reserved_size()  >= (size_t) _number_of_reserved_segments , "could not reserve enough space for segment map");
@@ -252,8 +262,8 @@ bool CodeHeap::expand_by(size_t size) {
     if (!_memory.expand_by(dm)) return false;
     on_code_mapping(base, dm);
     size_t i = _number_of_committed_segments;
-    _number_of_committed_segments = size_to_segments(_memory.committed_size());
-    assert(_number_of_reserved_segments == size_to_segments(_memory.reserved_size()), "number of reserved segments should not change");
+    _number_of_committed_segments = size_to_segments_down(_memory.committed_size());
+    assert(_number_of_reserved_segments == size_to_segments_down(_memory.reserved_size()), "number of reserved segments should not change");
     assert(_number_of_reserved_segments >= _number_of_committed_segments, "just checking");
     // expand _segmap space
     size_t ds = align_to_page_size(_number_of_committed_segments) - _segmap.committed_size();
@@ -269,7 +279,7 @@ bool CodeHeap::expand_by(size_t size) {
 
 
 void* CodeHeap::allocate(size_t instance_size) {
-  size_t number_of_segments = size_to_segments(instance_size + header_size());
+  size_t number_of_segments = size_to_segments_up(instance_size + header_size());
   assert(segments_to_size(number_of_segments) >= sizeof(FreeBlock), "not enough room for FreeList");
   assert_locked_or_safepoint(CodeCache_lock);
 
@@ -286,7 +296,7 @@ void* CodeHeap::allocate(size_t instance_size) {
               p2i(block), p2i(_memory.low_boundary()), p2i(_memory.high()));
     _max_allocated_capacity = MAX2(_max_allocated_capacity, allocated_capacity());
     _blob_count++;
-    return block->allocated_space();
+    return align_up(block->allocated_space(), 4);
   }
 
   // Ensure minimum size for allocation to the heap.
@@ -303,7 +313,7 @@ void* CodeHeap::allocate(size_t instance_size) {
               p2i(block), p2i(_memory.low_boundary()), p2i(_memory.high()));
     _max_allocated_capacity = MAX2(_max_allocated_capacity, allocated_capacity());
     _blob_count++;
-    return block->allocated_space();
+    return align_up(block->allocated_space(), 4);
   } else {
     return nullptr;
   }
@@ -343,7 +353,7 @@ void CodeHeap::deallocate_tail(void* p, size_t used_size) {
   assert(b->allocated_space() == p, "sanity check");
 
   size_t actual_number_of_segments = b->length();
-  size_t used_number_of_segments   = size_to_segments(used_size + header_size());
+  size_t used_number_of_segments   = size_to_segments_up(used_size + header_size());
   size_t unused_number_of_segments = actual_number_of_segments - used_number_of_segments;
   guarantee(used_number_of_segments <= actual_number_of_segments, "Must be!");
 

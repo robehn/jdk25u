@@ -64,7 +64,10 @@ void NativeStackPrinter::print_stack_from_frame(outputStream* st, frame fr,
         }
       }
       st->cr();
+      st->print_cr("-----");
+      fr.print_on(st);
       fr = frame::next_frame(fr, _current);
+      st->print_cr("###############################");
       if (fr.pc() == nullptr) {
         break;
       }

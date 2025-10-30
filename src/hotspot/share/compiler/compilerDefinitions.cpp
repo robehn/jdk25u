@@ -198,10 +198,10 @@ void CompilerConfig::set_client_emulation_mode_flags() {
     FLAG_SET_ERGO(NeverActAsServerClassMachine, true);
   }
   if (FLAG_IS_DEFAULT(InitialCodeCacheSize)) {
-    FLAG_SET_ERGO(InitialCodeCacheSize, 160*K);
+    FLAG_SET_ERGO(InitialCodeCacheSize, 30*M);
   }
   if (FLAG_IS_DEFAULT(ReservedCodeCacheSize)) {
-    FLAG_SET_ERGO(ReservedCodeCacheSize, 32*M);
+    FLAG_SET_ERGO(ReservedCodeCacheSize, 30*M);
   }
   if (FLAG_IS_DEFAULT(NonProfiledCodeHeapSize)) {
     FLAG_SET_ERGO(NonProfiledCodeHeapSize, 27*M);
@@ -317,10 +317,10 @@ void CompilerConfig::set_compilation_policy_flags() {
     }
     // Enable SegmentedCodeCache if tiered compilation is enabled, ReservedCodeCacheSize >= 240M
     // and the code cache contains at least 8 pages (segmentation disables advantage of huge pages).
-    if (FLAG_IS_DEFAULT(SegmentedCodeCache) && ReservedCodeCacheSize >= 240*M &&
+    /*if (FLAG_IS_DEFAULT(SegmentedCodeCache) && ReservedCodeCacheSize >= 240*M &&
         8 * CodeCache::page_size() <= ReservedCodeCacheSize) {
       FLAG_SET_ERGO(SegmentedCodeCache, true);
-    }
+    }*/
     if (Arguments::is_compiler_only()) { // -Xcomp
       // Be much more aggressive in tiered mode with -Xcomp and exercise C2 more.
       // We will first compile a level 3 version (C1 with full profiling), then do one invocation of it and
@@ -448,12 +448,12 @@ void CompilerConfig::set_jvmci_specific_flags() {
       }
     } else {
       // JVMCI needs values not less than defaults
-      if (FLAG_IS_DEFAULT(ReservedCodeCacheSize)) {
+      /*if (FLAG_IS_DEFAULT(ReservedCodeCacheSize)) {
         FLAG_SET_DEFAULT(ReservedCodeCacheSize, MAX2(64*M, ReservedCodeCacheSize));
       }
       if (FLAG_IS_DEFAULT(InitialCodeCacheSize)) {
         FLAG_SET_DEFAULT(InitialCodeCacheSize, MAX2(16*M, InitialCodeCacheSize));
-      }
+      }*/
       if (FLAG_IS_DEFAULT(NewSizeThreadIncrease)) {
         FLAG_SET_DEFAULT(NewSizeThreadIncrease, MAX2(4*K, NewSizeThreadIncrease));
       }
